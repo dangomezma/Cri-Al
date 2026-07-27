@@ -16,10 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from cifrados.views import procesar_cifrado
+from cifrados.views import procesar_cifrado, home
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     #Esta es la ruta API que usará nuestro JS
     path('api/procesar/', procesar_cifrado, name='procesar_cifrado'),
+    path('', home, name='home') #Para servir la página principal (index.html) desde Django
 ]
