@@ -74,3 +74,44 @@ def vigenere_decode(x: str, key: str):
         else:
             result += i
     return result
+
+
+"""
+XOR cipher implementation:
+"""
+    # codificador XOR (Álgebra de Boole)
+def xor_code(text: str, key: str):
+    if not key:
+        return text
+        
+    result = []
+    for i in range(len(text)):
+        # Convertimos a código ASCII
+        char_code = ord(text[i])
+        key_code = ord(key[i % len(key)])
+        
+        # Operación XOR bit a bit (^)
+        xor_result = char_code ^ key_code
+        
+        # Guardamos como texto hexadecimal de 2 dígitos para evitar caracteres invisibles
+        result.append(f"{xor_result:02x}")
+        
+    return "".join(result)
+
+# decodificador XOR
+def xor_decode(hex_text: str, key: str):
+    if not key:
+        return hex_text
+        
+    result = ""
+    # Procesamos el texto hexadecimal de 2 en 2 caracteres
+    for i in range(0, len(hex_text), 2):
+        # Convertimos el par hexadecimal de vuelta a entero
+        char_code = int(hex_text[i:i+2], 16)
+        key_code = ord(key[(i//2) % len(key)])
+        
+        # Aplicamos XOR nuevamente para revertir (Álgebra de Boole)
+        xor_result = char_code ^ key_code
+        result += chr(xor_result)
+        
+    return result
