@@ -45,9 +45,18 @@ echo "Activando el entorno virtual..."
 source venv/bin/activate
 
 if [ -f "requirements.txt" ]; then
-    echo "📚 Instalando dependencias desde requirements.txt..."
+    echo "Instalando dependencias desde requirements.txt..."
     pip install --upgrade pip
     pip install -r requirements.txt
 fi
 
-echo "El entorno virtual está activo y estás listo para trabajar."
+if [ -f "manage.py" ]; then
+    echo "🌐 Preparando apertura del navegador en http://127.0.0.1:8000/ ..."
+    # Subshell en segundo plano con '|| true' para que no rompa la regla de 'set -e'
+    (sleep 2 && (xdg-open http://127.0.0.1:8000/ || open http://127.0.0.1:8000/ || true) >/dev/null 2>&1) &
+
+    echo "Servidor iniciado. Presiona Ctrl+C para detener el servidor."
+    python manage.py runserver 0.0.0.0:8000
+else
+    echo "⚠️ No se encontró manage.py. El proyecto está listo pero el servidor no se inició."
+fi
