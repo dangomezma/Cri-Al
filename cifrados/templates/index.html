@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CriAl · Cuaderno de Cifrados</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg: '#12140d',
+          panel: '#191d12',
+          panel2: '#232817',
+          brass: '#c9974f',
+          brassdim: '#8f6b34',
+          parchment: '#ece3c6',
+          inkmuted: '#9a9678',
+          rust: '#b6532f',
+          line: '#3a3a26'
+        },
+        fontFamily: {
+          display: ['"Special Elite"', 'monospace'],
+          mono2: ['"IBM Plex Mono"', 'monospace']
+        }
+      }
+    }
+  }
+</script>
+<style>
+  body { font-family: 'IBM Plex Mono', monospace; }
+  .grain { position: relative; }
+  .grain::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(236,227,198,0.05) 1px, transparent 1px);
+    background-size: 3px 3px;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  .ruled {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent, transparent 27px,
+      rgba(201,151,79,0.12) 28px
+    );
+    background-attachment: local;
+  }
+  #ring-inner {
+    transition: transform 0.45s cubic-bezier(.2,.8,.2,1);
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #ring-inner { transition: none; }
+  }
+  .switch-thumb { transition: transform 0.25s ease, background-color 0.25s ease; }
+  .tab-btn { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+  ::selection { background: #c9974f; color: #12140d; }
+</style>
+</head>
+<body class="bg-bg text-parchment min-h-screen flex items-center justify-center p-4">
+
+  <div class="max-w-xl w-full">
+    <!-- Cabecera con disco cifrador -->
+    <div class="flex flex-col items-center mb-6">
+      <svg id="disco" viewBox="0 0 300 300" class="w-40 h-40 sm:w-48 sm:h-48 mb-3" aria-hidden="true">
+        <circle cx="150" cy="150" r="140" fill="none" stroke="#3a3a26" stroke-width="1.5"/>
+        <circle cx="150" cy="150" r="125" fill="none" stroke="#c9974f" stroke-width="1" opacity="0.5"/>
+        <g id="ring-outer"></g>
+        <g id="ring-inner">
+          <circle cx="150" cy="150" r="100" fill="#191d12" stroke="#8f6b34" stroke-width="1"/>
+          <g id="ring-inner-letters"></g>
+        </g>
+        <circle cx="150" cy="150" r="38" fill="#232817" stroke="#c9974f" stroke-width="1.5"/>
+        <text id="hub-label" x="150" y="150" text-anchor="middle" dominant-baseline="central"
+              font-family="'IBM Plex Mono', monospace" font-weight="700" font-size="20" fill="#ece3c6">+0</text>
+      </svg>
+      <h1 class="font-display text-3xl tracking-wide text-parchment">CriAl</h1>
+      <p class="text-inkmuted text-sm mt-1 tracking-wide">cuaderno de cifrados clásicos</p>
+    </div>
+
+    <!-- Panel principal -->
+    <div class="grain bg-panel border border-line rounded-sm shadow-2xl p-6 sm:p-8">
+      <form id="crypto-form" class="space-y-5" novalidate>
+
+        <!-- Selector de método -->
+        <div>
+          <span class="block text-xs uppercase tracking-widest text-inkmuted mb-2">Método de cifrado</span>
+          <div id="metodo-tabs" class="flex flex-wrap gap-2" role="radiogroup">
+            <button type="button" data-value="cesar" class="tab-btn flex-1 min-w-[100px] border border-brassdim rounded-sm py-2 px-3 text-sm font-semibold" aria-checked="true">César</button>
+            <button type="button" data-value="vigenere" class="tab-btn flex-1 min-w-[100px] border border-brassdim rounded-sm py-2 px-3 text-sm font-semibold" aria-checked="false">Vigenère</button>
+            <button type="button" data-value="xor" class="tab-btn flex-1 min-w-[100px] border border-brassdim rounded-sm py-2 px-3 text-sm font-semibold" aria-checked="false">XOR</button>
+          </div>
+          <p id="metodo-hint" class="text-xs text-inkmuted mt-2">Aritmética modular sobre el alfabeto.</p>
+        </div>
+
+        <!-- Interruptor cifrar / descifrar / fuerza bruta -->
+        <div>
+          <span class="block text-xs uppercase tracking-widest text-inkmuted mb-2">Acción</span>
+          <div id="accion-switch" class="inline-flex flex-wrap bg-panel2 border border-line rounded-full p-1 relative" role="radiogroup">
+            <button type="button" data-value="cifrar" class="switch-thumb relative z-10 px-5 py-1.5 text-sm font-semibold rounded-full" aria-checked="true">Cifrar</button>
+            <button type="button" data-value="descifrar" class="switch-thumb relative z-10 px-5 py-1.5 text-sm font-semibold rounded-full" aria-checked="false">Descifrar</button>
+            <!-- NUEVO: Botón Fuerza Bruta -->
+            <button type="button" id="btn-brute" data-value="bruteforce" class="switch-thumb relative z-10 px-5 py-1.5 text-sm font-semibold rounded-full" aria-checked="false">Fuerza Bruta</button>
+          </div>
+        </div>
+
+        <!-- Clave -->
+        <div id="contenedor-clave" class="transition-opacity duration-200">
+          <label id="label-clave" for="clave" class="block text-xs uppercase tracking-widest text-inkmuted mb-2">Desplazamiento</label>
+          <input type="text" id="clave" name="clave" placeholder="Ej: 3" required autocomplete="off"
+                 class="w-full bg-panel2 border border-line rounded-sm p-2.5 text-parchment placeholder-inkmuted/50 focus:ring-2 focus:ring-brass focus:border-brass focus:outline-none tracking-wide">
+          <p id="clave-error" class="text-sm text-rust mt-1 hidden"></p>
+        </div>
+
+        <!-- Texto de entrada -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label for="texto" class="block text-xs uppercase tracking-widest text-inkmuted">Texto de entrada</label>
+            <span id="contador" class="text-xs text-inkmuted">0 caracteres</span>
+          </div>
+          <textarea id="texto" name="texto" rows="3" placeholder="Escribe tu mensaje aquí..." required
+                    class="ruled w-full bg-panel2 border border-line rounded-sm p-2.5 text-parchment placeholder-inkmuted/50 focus:ring-2 focus:ring-brass focus:border-brass focus:outline-none leading-7"></textarea>
+          <p id="texto-error" class="text-sm text-rust mt-1 hidden"></p>
+        </div>
+
+        <!-- Botones -->
+        <div class="flex gap-3 pt-1">
+          <button type="submit" id="btn-procesar"
+                  class="flex-1 bg-brass hover:bg-[#dba85c] disabled:bg-brassdim disabled:cursor-not-allowed text-bg font-bold py-3 px-4 rounded-sm transition duration-200 flex items-center justify-center gap-2 tracking-wide">
+            <svg id="spinner" class="hidden animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span id="btn-texto">Procesar</span>
+          </button>
+          <button type="button" id="btn-limpiar"
+                  class="border border-line text-inkmuted hover:text-parchment hover:border-brassdim font-semibold py-3 px-4 rounded-sm transition duration-200 tracking-wide">
+            Limpiar
+          </button>
+        </div>
+      </form>
+
+      <!-- Resultado -->
+      <div class="mt-7 pt-6 border-t border-line">
+        <div class="flex items-center justify-between mb-2">
+          <label for="resultado" class="block text-xs uppercase tracking-widest text-inkmuted">Resultado</label>
+          <button type="button" id="btn-copiar" class="text-xs text-brass hover:text-[#dba85c] disabled:text-inkmuted/40 disabled:cursor-not-allowed tracking-wide" disabled>COPIAR</button>
+        </div>
+        <textarea id="resultado" rows="5" readonly aria-live="polite"
+                  class="w-full bg-bg border border-line rounded-sm p-2.5 text-brass font-semibold tracking-widest leading-6"
+                  style="text-shadow: 0 0 8px rgba(201,151,79,0.25); resize: vertical;"></textarea>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ---------- Disco cifrador ----------
+  const CX = 150, CY = 150;
+  const LETRAS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+  function construirAnillo(containerId, radio, color, tamano) {
+    const g = document.getElementById(containerId);
+    let html = '';
+    for (let i = 0; i < 26; i++) {
+      const angulo = i * (360 / 26);
+      html += `<g transform="rotate(${angulo} ${CX} ${CY})">
+        <text x="${CX}" y="${CY - radio}" text-anchor="middle" dominant-baseline="middle" font-family="'IBM Plex Mono', monospace" font-weight="600" font-size="${tamano}" fill="${color}">${LETRAS[i]}</text>
+      </g>`;
+    }
+    g.innerHTML = html;
+  }
+  construirAnillo('ring-outer', 128, '#c9974f', 13);
+  construirAnillo('ring-inner-letters', 82, '#ece3c6', 11.5);
+
+  function rotarDisco(shift) {
+    const n = ((shift % 26) + 26) % 26;
+    document.getElementById('ring-inner').style.transform = `rotate(${n * (360 / 26)}deg)`;
+  }
+
+  function actualizarHub(metodo, clave) {
+    const hub = document.getElementById('hub-label');
+    if (metodo === 'cesar') {
+      const n = parseInt(clave, 10);
+      hub.textContent = Number.isFinite(n) ? (n >= 0 ? `+${n}` : `${n}`) : '+0';
+      hub.setAttribute('font-size', '20');
+    } else if (metodo === 'vigenere') {
+      hub.textContent = 'VIG';
+      hub.setAttribute('font-size', '15');
+    } else {
+      hub.textContent = 'XOR';
+      hub.setAttribute('font-size', '15');
+    }
+  }
+
+  // ---------- Estado ----------
+  const AYUDAS = {
+    cesar: { label: 'Desplazamiento', placeholder: 'Ej: 3', hint: 'Aritmética modular sobre el alfabeto.' },
+    vigenere: { label: 'Clave (texto)', placeholder: 'Ej: clave', hint: 'Cada letra se desplaza según una clave repetida.' },
+    xor: { label: 'Clave secreta', placeholder: 'Ej: mi_secreto', hint: 'Combina cada carácter con la clave usando álgebra de Boole.' }
+  };
+
+  let metodoActual = 'cesar';
+  let accionActual = 'cifrar';
+
+  const labelClave = document.getElementById('label-clave');
+  const metodoHint = document.getElementById('metodo-hint');
+  const inputClave = document.getElementById('clave');
+  const claveError = document.getElementById('clave-error');
+  const contenedorClave = document.getElementById('contenedor-clave');
+  const textoInput = document.getElementById('texto');
+  const textoError = document.getElementById('texto-error');
+  const contador = document.getElementById('contador');
+  const form = document.getElementById('crypto-form');
+  const btnProcesar = document.getElementById('btn-procesar');
+  const btnTexto = document.getElementById('btn-texto');
+  const spinner = document.getElementById('spinner');
+  const resultado = document.getElementById('resultado');
+  const btnCopiar = document.getElementById('btn-copiar');
+  const btnLimpiar = document.getElementById('btn-limpiar');
+  const btnBrute = document.getElementById('btn-brute');
+
+  // ---------- Control segmentado: método ----------
+  const tabs = document.querySelectorAll('#metodo-tabs .tab-btn');
+  function pintarTabs() {
+    tabs.forEach(btn => {
+      const activo = btn.dataset.value === metodoActual;
+      btn.setAttribute('aria-checked', activo);
+      btn.classList.toggle('bg-brass', activo);
+      btn.classList.toggle('text-bg', activo);
+      btn.classList.toggle('border-brass', activo);
+      btn.classList.toggle('text-inkmuted', !activo);
+      btn.classList.toggle('border-brassdim', !activo);
+    });
+    
+    // Mostrar u ocultar Fuerza Bruta
+    if (metodoActual === 'cesar') {
+      btnBrute.classList.remove('hidden');
+    } else {
+      btnBrute.classList.add('hidden');
+      if (accionActual === 'bruteforce') {
+        accionActual = 'cifrar';
+        pintarSwitch();
+      }
+    }
+  }
+  
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    metodoActual = btn.dataset.value;
+    const cfg = AYUDAS[metodoActual];
+    labelClave.textContent = cfg.label;
+    inputClave.placeholder = cfg.placeholder;
+    metodoHint.textContent = cfg.hint;
+    ocultarError(claveError, inputClave);
+    actualizarHub(metodoActual, inputClave.value);
+    pintarTabs();
+  }));
+  pintarTabs();
+
+  // ---------- Interruptor: acción ----------
+  const switchBtns = document.querySelectorAll('#accion-switch .switch-thumb');
+  function pintarSwitch() {
+    switchBtns.forEach(btn => {
+      const activo = btn.dataset.value === accionActual;
+      btn.setAttribute('aria-checked', activo);
+      btn.classList.toggle('bg-brass', activo);
+      btn.classList.toggle('text-bg', activo);
+      btn.classList.toggle('text-inkmuted', !activo);
+    });
+
+    // Deshabilitar entrada de clave si es fuerza bruta
+    if (accionActual === 'bruteforce') {
+        inputClave.disabled = true;
+        contenedorClave.classList.add('opacity-40', 'pointer-events-none');
+        inputClave.value = '';
+        rotarDisco(0);
+        actualizarHub('cesar', '');
+    } else {
+        inputClave.disabled = false;
+        contenedorClave.classList.remove('opacity-40', 'pointer-events-none');
+    }
+  }
+  switchBtns.forEach(btn => btn.addEventListener('click', () => {
+    accionActual = btn.dataset.value;
+    pintarSwitch();
+  }));
+  pintarSwitch();
+
+  inputClave.addEventListener('input', () => {
+    ocultarError(claveError, inputClave);
+    if (metodoActual === 'cesar') {
+      const n = parseInt(inputClave.value, 10);
+      rotarDisco(Number.isFinite(n) ? n : 0);
+    }
+    actualizarHub(metodoActual, inputClave.value);
+  });
+
+  textoInput.addEventListener('input', () => {
+    contador.textContent = `${textoInput.value.length} caracteres`;
+    ocultarError(textoError, textoInput);
+  });
+
+  // ---------- Validación ----------
+  function ocultarError(errorEl, inputEl) {
+    errorEl.classList.add('hidden');
+    errorEl.textContent = '';
+    inputEl.classList.remove('border-rust');
+  }
+  function mostrarError(errorEl, inputEl, mensaje) {
+    errorEl.textContent = mensaje;
+    errorEl.classList.remove('hidden');
+    inputEl.classList.add('border-rust');
+  }
+  function validar() {
+    let valido = true;
+    ocultarError(claveError, inputClave);
+    ocultarError(textoError, textoInput);
+
+    if (!textoInput.value.trim()) {
+      mostrarError(textoError, textoInput, 'Escribe un texto para procesar.');
+      valido = false;
+    }
+    
+    // Solo valida la clave si NO estamos en modo fuerza bruta
+    if (accionActual !== 'bruteforce') {
+        const clave = inputClave.value.trim();
+        if (!clave) {
+          mostrarError(claveError, inputClave, 'Este campo es obligatorio.');
+          valido = false;
+        } else if (metodoActual === 'cesar' && !/^-?\d+$/.test(clave)) {
+          mostrarError(claveError, inputClave, 'El desplazamiento debe ser un número entero (ej: 3 o -5).');
+          valido = false;
+        }
+    }
+    return valido;
+  }
+
+  function setCargando(cargando) {
+    btnProcesar.disabled = cargando;
+    spinner.classList.toggle('hidden', !cargando);
+    btnTexto.textContent = cargando ? 'Procesando...' : 'Procesar';
+  }
+
+  // ---------- Envío al backend ----------
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!validar()) return;
+
+    const payload = {
+      metodo: metodoActual,
+      accion: accionActual,
+      clave: inputClave.value.trim(),
+      texto: textoInput.value
+    };
+
+    setCargando(true);
+    resultado.value = '';
+    btnCopiar.disabled = true;
+
+    try {
+      const response = await fetch('/api/procesar/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      let data;
+      try { data = await response.json(); } catch { throw new Error('El servidor devolvió una respuesta inesperada.'); }
+
+      if (!response.ok) throw new Error(data.error || `Error del servidor (${response.status}).`);
+      if (data.resultado === undefined) throw new Error(data.error || 'Respuesta sin resultado.');
+
+      resultado.value = data.resultado;
+      btnCopiar.disabled = false;
+    } catch (err) {
+      resultado.value = '';
+      mostrarError(textoError, textoInput, err.message || 'Error al conectar con el servidor.');
+    } finally {
+      setCargando(false);
+    }
+  });
+
+  // ---------- Copiar y Limpiar ----------
+  btnCopiar.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(resultado.value);
+      const original = btnCopiar.textContent;
+      btnCopiar.textContent = 'COPIADO';
+      setTimeout(() => (btnCopiar.textContent = original), 1500);
+    } catch {
+      resultado.select();
+      document.execCommand('copy');
+    }
+  });
+
+  btnLimpiar.addEventListener('click', () => {
+    form.reset();
+    resultado.value = '';
+    contador.textContent = '0 caracteres';
+    btnCopiar.disabled = true;
+    ocultarError(claveError, inputClave);
+    ocultarError(textoError, textoInput);
+    metodoActual = 'cesar';
+    accionActual = 'cifrar';
+    pintarTabs();
+    pintarSwitch();
+    labelClave.textContent = AYUDAS.cesar.label;
+    inputClave.placeholder = AYUDAS.cesar.placeholder;
+    metodoHint.textContent = AYUDAS.cesar.hint;
+    rotarDisco(0);
+    actualizarHub('cesar', '');
+  });
+</script>
+</body>
+</html>

@@ -34,21 +34,25 @@ Vigenere cipher implementation:
 # codificador vigenere
 def vigenere_code(x: str, key: str):
     x = x.lower()
-    key = key.lower()
+    # Filtramos la clave para que solo contenga letras del abecedario
+    key_clean = "".join([c for c in key.lower() if c in alphabet])
+    
+    if not key_clean:
+        raise ValueError("La clave para Vigenère debe contener letras.")
+        
     result = ""
     key_index = 0
     
     for i in x:
         if i in alphabet:
             position = alphabet.index(i)
-            # Obtenemos el desplazamiento basado en la letra actual de la clave
-            k = alphabet.index(key[key_index % len(key)])
+            # Usamos la clave limpia para evitar el error 'substring not found'
+            k = alphabet.index(key_clean[key_index % len(key_clean)])
             
             # Aplicamos la aritmética modular: E(x) = (x + k) mod 26
             nueva_posicion = (position + k) % 26
             result += alphabet[nueva_posicion]
             
-            # Avanzamos el índice de la clave solo si ciframos una letra válida
             key_index += 1
         else:
             result += i
@@ -57,14 +61,18 @@ def vigenere_code(x: str, key: str):
 # decodificador vigenere
 def vigenere_decode(x: str, key: str):
     x = x.lower()
-    key = key.lower()
+    key_clean = "".join([c for c in key.lower() if c in alphabet])
+    
+    if not key_clean:
+        raise ValueError("La clave para Vigenère debe contener letras.")
+        
     result = ""
     key_index = 0
     
     for i in x:
         if i in alphabet:
             position = alphabet.index(i)
-            k = alphabet.index(key[key_index % len(key)])
+            k = alphabet.index(key_clean[key_index % len(key_clean)])
             
             # Aplicamos la aritmética modular inversa: D(x) = (x - k) mod 26
             nueva_posicion = (position - k) % 26
@@ -74,7 +82,6 @@ def vigenere_decode(x: str, key: str):
         else:
             result += i
     return result
-
 
 """
 XOR cipher implementation:
